@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getProyectos } from "../api/proyectos";
 import { getUsuarios } from "../api/usuarios";
 import {
-  getAsistenciaPorProyecto,
+  getAsistenciaFiltrada,
   registrarManual,
   actualizarAsistencia,
   eliminarAsistencia,
@@ -38,6 +38,26 @@ function AsistenciaModal({ registro, proyectos, usuarios, onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // PR36/PR37 — check-out debe ser posterior al check-in
+    if (form.checkIn && form.checkOut) {
+      const entrada = new Date(form.checkIn);
+      const salida = new Date(form.checkOut);
+      if (salida <= entrada) {
+        setError("La hora de salida debe ser posterior a la hora de entrada. Las horas deben ser un valor numérico positivo.");
+        return;
+      }
+    }
+
+    // PR38/PR39 — usuario inactivo
+    const usuarioSeleccionado = usuarios.find(
+      (u) => String(u.id) === String(form.userId)
+    );
+    if (usuarioSeleccionado && !usuarioSeleccionado.active) {
+      setError("El usuario seleccionado está inactivo. No se puede registrar su participación.");
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = {
@@ -84,7 +104,9 @@ function AsistenciaModal({ registro, proyectos, usuarios, onClose, onSaved }) {
             >
               <option value="">Selecciona un usuario</option>
               {usuarios.map((u) => (
-                <option key={u.id} value={u.id}>{u.fullName}</option>
+                <option key={u.id} value={u.id}>
+                  {u.fullName} {!u.active ? "(inactivo)" : ""}
+                </option>
               ))}
             </select>
           </div>
@@ -158,12 +180,15 @@ function AsistenciaModal({ registro, proyectos, usuarios, onClose, onSaved }) {
 }
 
 export default function AsistenciaPage() {
-  const { isAdmin, isCoordinador, user } = useAuth();
+  const { isAdmin, isCoordinador } = useAuth();
   const canEdit = isAdmin() || isCoordinador();
 
   const [proyectos, setProyectos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState("");
+  const [usuarioFiltro, setUsuarioFiltro] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -172,7 +197,8 @@ export default function AsistenciaPage() {
   const [resumen, setResumen] = useState(null);
 
   useEffect(() => {
-    getProyectos()
+    // PR29/PR30 — Solo proyectos activos en el selector
+    getProyectos({ status: "ACTIVO" })
       .then((res) => {
         setProyectos(res.data || []);
         if (res.data?.length > 0) setProyectoSeleccionado(res.data[0].id);
@@ -190,14 +216,20 @@ export default function AsistenciaPage() {
     if (!proyectoSeleccionado) return;
     setLoading(true);
     try {
-      const { data } = await getAsistenciaPorProyecto(proyectoSeleccionado);
+      // PR52 — Usa filtrado avanzado con projectId, userId y rango de fechas
+      const params = { projectId: proyectoSeleccionado };
+      if (usuarioFiltro) params.userId = usuarioFiltro;
+      if (fechaDesde) params.from = fechaDesde + "T00:00:00";
+      if (fechaHasta) params.to = fechaHasta + "T23:59:59";
+
+      const { data } = await getAsistenciaFiltrada(params);
       setRegistros(data);
     } catch {
       setRegistros([]);
     } finally {
       setLoading(false);
     }
-  }, [proyectoSeleccionado]);
+  }, [proyectoSeleccionado, usuarioFiltro, fechaDesde, fechaHasta]);
 
   const fetchResumen = useCallback(async () => {
     if (!proyectoSeleccionado) return;
@@ -218,6 +250,7 @@ export default function AsistenciaPage() {
     setModalOpen(false);
     setRegistroEdit(null);
     fetchRegistros();
+    // PR56 — refrescar resumen tras editar para ver horas actualizadas
     fetchResumen();
   };
 
@@ -227,10 +260,20 @@ export default function AsistenciaPage() {
       await eliminarAsistencia(confirmDelete.id);
       setConfirmDelete(null);
       fetchRegistros();
+      // PR61 — refrescar resumen tras eliminar
+      fetchResumen();
     } catch {
       alert("No se pudo eliminar el registro.");
     }
   };
+
+  const limpiarFiltros = () => {
+    setUsuarioFiltro("");
+    setFechaDesde("");
+    setFechaHasta("");
+  };
+
+  const hayFiltrosActivos = usuarioFiltro || fechaDesde || fechaHasta;
 
   const formatFecha = (str) => {
     if (!str) return "—";
@@ -242,12 +285,18 @@ export default function AsistenciaPage() {
 
   return (
     <div className="space-y-5">
+
       {/* Selector de proyecto */}
       <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-wrap items-center gap-3">
         <label className="text-xs font-medium text-gray-600">Proyecto:</label>
         <select
           value={proyectoSeleccionado}
-          onChange={(e) => setProyectoSeleccionado(e.target.value)}
+          onChange={(e) => {
+            setProyectoSeleccionado(e.target.value);
+            setUsuarioFiltro("");
+            setFechaDesde("");
+            setFechaHasta("");
+          }}
           className="h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
         >
           {proyectos.map((p) => (
@@ -256,24 +305,90 @@ export default function AsistenciaPage() {
         </select>
       </div>
 
-      {/* Resumen de horas */}
-      {resumen && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: "Total registros", value: resumen.totalRecords ?? "—" },
-            { label: "Total horas", value: resumen.totalHours != null ? `${resumen.totalHours}h` : "—" },
-            { label: "Participantes", value: resumen.totalUsers ?? "—" },
-            { label: "Promedio horas", value: resumen.averageHours != null ? `${resumen.averageHours}h` : "—" },
-          ].map((s) => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4">
-              <p className="text-xs text-gray-400">{s.label}</p>
-              <p className="text-xl font-semibold text-indigo-600 mt-1">{s.value}</p>
+      {/* PR52 + PR53 — Filtros por fechas y usuario */}
+      {canEdit && (
+        <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Filtro por usuario — PR53 */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Usuario</label>
+              <select
+                value={usuarioFiltro}
+                onChange={(e) => setUsuarioFiltro(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 w-44"
+              >
+                <option value="">Todos</option>
+                {usuarios.map((u) => (
+                  <option key={u.id} value={u.id}>{u.fullName}</option>
+                ))}
+              </select>
             </div>
-          ))}
+
+            {/* Filtro fecha desde — PR52 */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={(e) => setFechaDesde(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+
+            {/* Filtro fecha hasta — PR52 */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Hasta</label>
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={(e) => setFechaHasta(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+
+            {/* Limpiar filtros */}
+            {hayFiltrosActivos && (
+              <button
+                onClick={limpiarFiltros}
+                className="h-9 px-3 rounded-lg border border-gray-200 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                Limpiar filtros
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Acciones */}
+      {/* Resumen de horas — PR56 se verifica aquí */}
+      {resumen && resumen.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+            <p className="text-xs font-medium text-gray-600">Resumen de horas por participante</p>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="text-left text-xs font-medium text-gray-500 px-5 py-2">Participante</th>
+                <th className="text-left text-xs font-medium text-gray-500 px-5 py-2">Sesiones</th>
+                <th className="text-left text-xs font-medium text-gray-500 px-5 py-2">Total horas</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {resumen.map((r) => (
+                <tr key={r.userId} className="hover:bg-gray-50">
+                  <td className="px-5 py-2 text-gray-800 font-medium">{r.userFullName}</td>
+                  <td className="px-5 py-2 text-gray-500">{r.totalSessions}</td>
+                  <td className="px-5 py-2">
+                    <span className="text-emerald-600 font-semibold">{r.totalHours}h</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Botón registro manual */}
       {canEdit && (
         <div className="flex justify-end">
           <button
@@ -288,7 +403,7 @@ export default function AsistenciaPage() {
         </div>
       )}
 
-      {/* Tabla */}
+      {/* Tabla de registros */}
       {loading ? (
         <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-3">
           {[...Array(5)].map((_, i) => (
@@ -297,13 +412,25 @@ export default function AsistenciaPage() {
         </div>
       ) : registros.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-          <p className="text-sm text-gray-400">No hay registros de asistencia.</p>
+          <p className="text-sm text-gray-400">
+            {hayFiltrosActivos
+              ? "No hay registros para los filtros aplicados."
+              : "No hay registros de asistencia."}
+          </p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <p className="text-xs font-medium text-gray-600">
+              {registros.length} registro{registros.length !== 1 ? "s" : ""}
+              {hayFiltrosActivos && (
+                <span className="ml-2 text-indigo-500">(filtrado)</span>
+              )}
+            </p>
+          </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
+              <tr className="border-b border-gray-100">
                 <th className="text-left text-xs font-medium text-gray-500 px-5 py-3">Usuario</th>
                 <th className="text-left text-xs font-medium text-gray-500 px-5 py-3 hidden md:table-cell">Check-in</th>
                 <th className="text-left text-xs font-medium text-gray-500 px-5 py-3 hidden md:table-cell">Check-out</th>
@@ -343,6 +470,7 @@ export default function AsistenciaPage() {
                         >
                           Editar
                         </button>
+                        {/* PR58-PR61 — solo Admin */}
                         {isAdmin() && (
                           <button
                             onClick={() => setConfirmDelete(r)}
@@ -361,7 +489,7 @@ export default function AsistenciaPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal crear/editar */}
       {modalOpen && (
         <AsistenciaModal
           registro={registroEdit}
@@ -372,13 +500,15 @@ export default function AsistenciaPage() {
         />
       )}
 
-      {/* Confirm delete */}
+      {/* PR58-PR61 — Confirm delete */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl space-y-4">
             <h3 className="text-sm font-semibold text-gray-800">¿Eliminar registro?</h3>
             <p className="text-xs text-gray-500">
-              Se eliminará el registro de <span className="font-medium text-gray-700">{confirmDelete.userFullName}</span>. Esta acción no se puede deshacer.
+              Se eliminará el registro de asistencia de{" "}
+              <span className="font-medium text-gray-700">{confirmDelete.userFullName}</span>.
+              Esta acción actualizará el total de horas acumuladas y no se puede deshacer.
             </p>
             <div className="flex gap-3">
               <button

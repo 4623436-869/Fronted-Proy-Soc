@@ -30,7 +30,6 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
         coordinatorId: proyecto.coordinatorId || "",
       });
     }
-    // Cargar coordinadores para el select
     getUsuarios()
       .then((res) => setCoordinadores(res.data || []))
       .catch(() => {});
@@ -43,6 +42,13 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // PR27/PR28 — Validación fecha fin anterior a fecha inicio
+    if (form.startDate && form.endDate && form.endDate < form.startDate) {
+      setError("La fecha de fin debe ser posterior al inicio.");
+      return;
+    }
+
     setLoading(true);
     try {
       if (isEdit) {
@@ -61,7 +67,6 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-800">
             {isEdit ? "Editar proyecto" : "Nuevo proyecto"}
@@ -73,7 +78,6 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Nombre *</label>

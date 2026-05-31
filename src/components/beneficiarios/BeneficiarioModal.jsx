@@ -35,7 +35,8 @@ export default function BeneficiarioModal({ beneficiario, projectId, onClose, on
       setForm((prev) => ({ ...prev, projectId: projectId || "" }));
     }
 
-    getProyectos()
+    // PR29/PR30 — Solo proyectos activos disponibles
+    getProyectos({ status: "ACTIVO" })
       .then((res) => setProyectos(res.data || []))
       .catch(() => {});
   }, [beneficiario, projectId]);

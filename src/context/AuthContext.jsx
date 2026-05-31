@@ -17,10 +17,17 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setUser(null);
+  const logout = async () => {
+    try {
+      // PR74 — Llama al backend para invalidar la sesión en BD
+      await api.post("/auth/logout");
+    } catch {
+      // Si falla igual limpiamos el frontend
+    } finally {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      setUser(null);
+    }
   };
 
   const isAdmin = () => user?.role === "ROLE_ADMIN";
