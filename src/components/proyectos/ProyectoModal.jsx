@@ -6,7 +6,9 @@ const EMPTY = {
   name: "",
   description: "",
   startDate: "",
+  startTime: "08:00",
   endDate: "",
+  endTime: "17:00",
   status: "ACTIVO",
   coordinatorId: "",
 };
@@ -21,11 +23,23 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
 
   useEffect(() => {
     if (proyecto) {
+      // Separar fecha y hora del LocalDateTime que viene del backend
+      const splitDateTime = (dt) => {
+        if (!dt) return { date: "", time: "08:00" };
+        const [date, time] = dt.split("T");
+        return { date, time: time ? time.slice(0, 5) : "08:00" };
+      };
+
+      const start = splitDateTime(proyecto.startDate);
+      const end = splitDateTime(proyecto.endDate);
+
       setForm({
         name: proyecto.name || "",
         description: proyecto.description || "",
-        startDate: proyecto.startDate || "",
-        endDate: proyecto.endDate || "",
+        startDate: start.date,
+        startTime: start.time,
+        endDate: end.date,
+        endTime: end.time,
         status: proyecto.status || "ACTIVO",
         coordinatorId: proyecto.coordinatorId || "",
       });
@@ -51,10 +65,20 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
 
     setLoading(true);
     try {
+      // Combinar fecha y hora en formato LocalDateTime para el backend
+      const payload = {
+        name: form.name,
+        description: form.description,
+        startDate: `${form.startDate}T${form.startTime}:00`,
+        endDate: form.endDate ? `${form.endDate}T${form.endTime}:00` : null,
+        status: form.status,
+        coordinatorId: form.coordinatorId || null,
+      };
+
       if (isEdit) {
-        await updateProyecto(proyecto.id, form);
+        await updateProyecto(proyecto.id, payload);
       } else {
-        await createProyecto(form);
+        await createProyecto(payload);
       }
       onSaved();
     } catch (err) {
@@ -66,8 +90,8 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
           <h2 className="text-sm font-semibold text-gray-800">
             {isEdit ? "Editar proyecto" : "Nuevo proyecto"}
           </h2>
@@ -79,8 +103,11 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Nombre */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Nombre *</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Nombre *
+            </label>
             <input
               name="name"
               required
@@ -90,8 +117,11 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
             />
           </div>
 
+          {/* Descripción */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Descripción</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Descripción
+            </label>
             <textarea
               name="description"
               value={form.description}
@@ -101,9 +131,12 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Fecha inicio *</label>
+          {/* Fecha inicio + Hora inicio */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Fecha de inicio *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
               <input
                 type="date"
                 name="startDate"
@@ -112,9 +145,22 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
                 onChange={handleChange}
                 className="w-full h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
+              <input
+                type="time"
+                name="startTime"
+                value={form.startTime}
+                onChange={handleChange}
+                className="w-full h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Fecha fin *</label>
+          </div>
+
+          {/* Fecha fin + Hora fin */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Fecha de fin *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
               <input
                 type="date"
                 name="endDate"
@@ -123,11 +169,21 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
                 onChange={handleChange}
                 className="w-full h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
+              <input
+                type="time"
+                name="endTime"
+                value={form.endTime}
+                onChange={handleChange}
+                className="w-full h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
             </div>
           </div>
 
+          {/* Estado */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Estado</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Estado
+            </label>
             <select
               name="status"
               value={form.status}
@@ -140,8 +196,11 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
             </select>
           </div>
 
+          {/* Coordinador */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Coordinador</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Coordinador
+            </label>
             <select
               name="coordinatorId"
               value={form.coordinatorId}
