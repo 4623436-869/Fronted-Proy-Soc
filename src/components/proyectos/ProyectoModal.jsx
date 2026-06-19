@@ -10,6 +10,8 @@ const EMPTY = {
   endDate: "",
   endTime: "17:00",
   status: "ACTIVO",
+  cicloAcademico: "",
+  campus: "LIMA",
   coordinatorId: "",
 };
 
@@ -41,6 +43,8 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
         endDate: end.date,
         endTime: end.time,
         status: proyecto.status || "ACTIVO",
+        cicloAcademico: proyecto.cicloAcademico || "",
+        campus: proyecto.campus || "LIMA",
         coordinatorId: proyecto.coordinatorId || "",
       });
     }
@@ -63,6 +67,12 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
       return;
     }
 
+    // Validación formato ciclo académico (AAAA-N)
+    if (!/^\d{4}-[1-2]$/.test(form.cicloAcademico)) {
+      setError("El ciclo académico debe tener formato AAAA-N, ej: 2025-1");
+      return;
+    }
+
     setLoading(true);
     try {
       // Combinar fecha y hora en formato LocalDateTime para el backend
@@ -72,6 +82,8 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
         startDate: `${form.startDate}T${form.startTime}:00`,
         endDate: form.endDate ? `${form.endDate}T${form.endTime}:00` : null,
         status: form.status,
+        cicloAcademico: form.cicloAcademico,
+        campus: form.campus,
         coordinatorId: form.coordinatorId || null,
       };
 
@@ -176,6 +188,38 @@ export default function ProyectoModal({ proyecto, onClose, onSaved }) {
                 onChange={handleChange}
                 className="w-full h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
+            </div>
+          </div>
+
+          {/* Ciclo académico + Campus */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Ciclo académico *
+              </label>
+              <input
+                name="cicloAcademico"
+                required
+                placeholder="2025-1"
+                value={form.cicloAcademico}
+                onChange={handleChange}
+                className="w-full h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Campus *
+              </label>
+              <select
+                name="campus"
+                value={form.campus}
+                onChange={handleChange}
+                className="w-full h-9 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              >
+                <option value="LIMA">Lima</option>
+                <option value="JULIACA">Juliaca</option>
+                <option value="TARAPOTO">Tarapoto</option>
+              </select>
             </div>
           </div>
 
