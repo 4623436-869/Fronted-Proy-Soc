@@ -23,3 +23,6 @@ export const getTotalHoras = (userId, projectId) =>
 
 export const getResumenProyecto = (projectId) =>
   api.get(`/attendance/summary/project/${projectId}`);
+
+export const getResumenHorasEstudiante = (userId) =>
+  api.get(`/attendance/student-summary/${userId}`);

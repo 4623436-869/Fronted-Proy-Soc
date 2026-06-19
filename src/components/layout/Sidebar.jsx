@@ -32,6 +32,18 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+
+{
+    label: "Consulta de Horas",
+    path: "/consulta-horas",
+    roles: ["ROLE_ADMIN", "ROLE_COORDINADOR"],
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+      </svg>
+    ),
+  },
+
   {
     label: "Asistencia",
     path: "/asistencia",
