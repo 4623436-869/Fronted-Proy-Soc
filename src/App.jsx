@@ -10,6 +10,7 @@ import AsistenciaPage from "./pages/AsistenciaPage";
 import QRPage from "./pages/QRPage";
 import UsuariosPage from "./pages/UsuariosPage";
 import ConsultaHorasPage from "./pages/ConsultaHorasPage";
+import RepositorioDocumentosPage from "./pages/RepositorioDocumentosPage";
 
 export default function App() {
   return (
@@ -50,6 +51,14 @@ export default function App() {
               element={
                 <PrivateRoute roles={["ROLE_ADMIN", "ROLE_COORDINADOR"]}>
                   <ConsultaHorasPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/documentos"
+              element={
+                <PrivateRoute roles={["ROLE_ADMIN", "ROLE_COORDINADOR", "ROLE_ESTUDIANTE"]}>
+                  <RepositorioDocumentosPage />
                 </PrivateRoute>
               }
             />
