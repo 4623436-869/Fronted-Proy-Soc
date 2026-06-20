@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { buscarEstudiantes } from "../api/usuarios";
 import { getResumenHorasEstudiante } from "../api/asistencia";
+import { descargarReporteEstudianteExcel, descargarReporteEstudiantePdf } from "../api/reportes";
 
 export default function ConsultaHorasPage() {
   const [query, setQuery] = useState("");
@@ -11,6 +12,7 @@ export default function ConsultaHorasPage() {
   const [estudianteSel, setEstudianteSel] = useState(null);
   const [resumen, setResumen] = useState(null);
   const [cargandoResumen, setCargandoResumen] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
   const handleBuscar = async (e) => {
     e.preventDefault();
@@ -43,6 +45,23 @@ export default function ConsultaHorasPage() {
       alert("No se pudo obtener el resumen de horas de este estudiante.");
     } finally {
       setCargandoResumen(false);
+    }
+  };
+
+  const handleExportar = async (formato) => {
+    if (!estudianteSel) return;
+    setExportando(true);
+    try {
+      const nombreBase = `reporte-${estudianteSel.fullName.replace(/\s+/g, "_")}`;
+      if (formato === "excel") {
+        await descargarReporteEstudianteExcel(estudianteSel.id, `${nombreBase}.xlsx`);
+      } else {
+        await descargarReporteEstudiantePdf(estudianteSel.id, `${nombreBase}.pdf`);
+      }
+    } catch {
+      alert("No se pudo generar el reporte.");
+    } finally {
+      setExportando(false);
     }
   };
 
@@ -145,6 +164,30 @@ export default function ConsultaHorasPage() {
                     </p>
                     <p className="text-xs text-gray-400">horas acumuladas (todos los ciclos)</p>
                   </div>
+                </div>
+
+                {/* Botones exportar */}
+                <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={() => handleExportar("excel")}
+                    disabled={exportando}
+                    className="flex-1 h-9 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H8a2 2 0 01-2-2V5a2 2 0 012-2h6l6 6v11a2 2 0 01-2 2z" />
+                    </svg>
+                    Exportar Excel
+                  </button>
+                  <button
+                    onClick={() => handleExportar("pdf")}
+                    disabled={exportando}
+                    className="flex-1 h-9 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H8a2 2 0 01-2-2V5a2 2 0 012-2h6l6 6v11a2 2 0 01-2 2z" />
+                    </svg>
+                    Exportar PDF
+                  </button>
                 </div>
               </div>
 
